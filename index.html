@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Fantasy D&D Map Generator</title>
+    <style>
+        :root {
+            --dark-bg: #0a0a0a;
+            --darker-bg: #050505;
+            --dark-accent: #1a1a1a;
+            --blood-red: #8b0000;
+            --gold: #daa520;
+            --parchment: #f5e7c1;
+            --shadow: rgba(0, 0, 0, 0.75);
+            --glow: rgba(139, 0, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Times New Roman', serif;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--parchment);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #app {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            grid-template-rows: 60px 1fr;
+            height: 100vh;
+        }
+
+        header {
+            grid-column: 1 / 3;
+            background-color: var(--darker-bg);
+            border-bottom: 2px solid var(--blood-red);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            box-shadow: 0 2px 10px var(--shadow);
+            z-index: 10;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--gold);
+            text-shadow: 0 0 5px var(--glow);
+            letter-spacing: 2px;
+        }
+
+        .menu-button {
+            background: none;
+            border: none;
+            color: var(--parchment);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 8px 15px;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .menu-button:hover {
+            background-color: var(--blood-red);
+            text-shadow: 0 0 5px var(--glow);
+        }
+
+        .sidebar {
+            background-color: var(--dark-accent);
+            border-right: 1px solid #333;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+        }
+
+        .sidebar-title {
+            color: var(--gold);
+            margin-bottom: 10px;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .terrain-options, .object-options, .monster-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .option {
+            background-color: var(--darker-bg);
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .option:hover {
+            border-color: var(--gold);
+            box-shadow: 0 0 10px var(--glow);
+        }
+
+        .option.selected {
+            border-color: var(--blood-red);
+            background-color: var(--blood-red);
+        }
+
+        .option-icon {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 5px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .main-content {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .map-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #222;
+            overflow: hidden;
+            cursor: crosshair;
+            transition: transform 0.3s;
+        }
+
+        .map-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 2000px;
+            height: 2000px;
+            background-image: 
+                linear-gradient(rgba(50, 50, 50, 0.5) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(50, 50, 50, 0.5) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .map-tile {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background-size: cover;
+            background-position: center;
+            transition: all 0.3s;
+        }
+
+        .map-object {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            cursor: move;
+            z-index: 2;
+            transition: transform 0.2s;
+        }
+
+        .map-object:hover {
+            transform: scale(1.1);
+            filter: drop-shadow(0 0 5px var(--blood-red));
+        }
+
+        .map-object.boss {
+            filter: drop-shadow(0 0 10px var(--blood-red));
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 5;
+        }
+
+        .control-button {
+            background-color: var(--dark-accent);
+            border: 1px solid var(--gold);
+            color: var(--parchment);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+
+        .control-button:hover {
+            background-color: var(--blood-red);
+            transform: scale(1.1);
+        }
+
+        .zoom-level {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            background-color: var(--dark-accent);
+            padding: 5px 10px;
+            border-radius: 20px;
+            border: 1px solid var(--gold);
+            font-size: 14px;
+        }
+
+        .context-menu {
+            position: absolute;
+            background-color: var(--dark-accent);
+            border: 1px solid var(--gold);
+            border-radius: 4px;
+            box-shadow: 0 0 10px var(--shadow);
+            z-index: 100;
+            display: none;
+        }
+
+        .context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            color: var(--parchment);
+            transition: all 0.2s;
+        }
+
+        .context-menu-item:hover {
+            background-color: var(--blood-red);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background-color: var(--dark-accent);
+            border: 2px solid var(--gold);
+            border-radius: 8px;
+            padding: 20px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            animation: modalFadeIn 0.4s;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: var(--parchment);
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: 200px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            margin-bottom: 15px;
+            border: 1px solid #333;
+        }
+
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+
+        .tab-button {
+            padding: 8px 15px;
+            background: none;
+            border: none;
+            color: var(--parchment);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-button.active {
+            border-bottom: 2px solid var(--blood-red);
+            color: var(--gold);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .save-load-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .save-load-input {
+            width: 100%;
+            padding: 8px;
+            background-color: var(--darker-bg);
+            border: 1px solid #333;
+            color: var(--parchment);
+            margin-bottom: 10px;
+        }
+
+        .selection-area {
+            position: absolute;
+            background-color: rgba(139, 0, 0, 0.3);
+            border: 1px dashed var(--blood-red);
+            pointer-events: none;
+            z-index: 3;
+            display: none;
+        }
+
+        .fog-of-war {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1;
+        }
+
+        .view-mode-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 5;
+        }
+
+        /* Terrain specific styles */
+        .terrain-grass {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23225522"/><path d="M20,50 Q30,30 40,50 T60,50 T80,30" stroke="%23338833" fill="none" stroke-width="2"/><circle cx="30" cy="40" r="3" fill="%23338833"/><circle cx="50" cy="45" r="3" fill="%23338833"/><circle cx="70" cy="35" r="3" fill="%23338833"/></svg>');
+        }
+
+        .terrain-winter {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23e0f7fa"/><path d="M20,30 Q30,20 40,30 T60,30 T80,20" stroke="%23ffffff" fill="none" stroke-width="3"/><circle cx="25" cy="25" r="4" fill="%23ffffff"/><circle cx="50" cy="20" r="4" fill="%23ffffff"/><circle cx="75" cy="30" r="4" fill="%23ffffff"/></svg>');
+        }
+
+        .terrain-desert {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23f5d742"/><path d="M10,60 Q30,50 50,60 T90,50" stroke="%23e6c229" fill="none" stroke-width="3"/><circle cx="30" cy="55" r="5" fill="%23e6c229"/><circle cx="60" cy="50" r="5" fill="%23e6c229"/></svg>');
+        }
+
+        .terrain-swamp {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23226633"/><path d="M20,70 Q30,60 40,70 T60,70 T80,60" stroke="%23114422" fill="none" stroke-width="2"/><circle cx="30" cy="65" r="4" fill="%23114422"/><circle cx="50" cy="70" r="4" fill="%23114422"/><circle cx="70" cy="60" r="4" fill="%23114422"/><circle cx="40" cy="80" r="3" fill="%23114422"/><circle cx="60" cy="75" r="3" fill="%23114422"/></svg>');
+        }
+
+        .terrain-mountain {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23333"/><path d="M10,80 L30,40 L50,70 L70,30 L90,80 Z" fill="%23555" stroke="%23777" stroke-width="2"/></svg>');
+        }
+
+        .terrain-water {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a3c8f"/><path d="M10,60 Q20,50 30,60 T50,60 T70,50 T90,60" stroke="%23255" fill="none" stroke-width="2"/><path d="M10,70 Q20,60 30,70 T50,70 T70,60 T90,70" stroke="%23255" fill="none" stroke-width="2" opacity="0.7"/></svg>');
+        }
+
+        /* Object icons */
+        .object-village {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect x="20" y="40" width="40" height="30" fill="%23775533"/><rect x="30" y="50" width="20" height="20" fill="%23333"/><polygon points="30,20 50,20 60,40 20,40" fill="%238b0000"/><rect x="35" y="30" width="10" height="10" fill="%23daa520"/></svg>');
+        }
+
+        .object-dungeon {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect x="20" y="40" width="40" height="30" fill="%23333"/><rect x="30" y="50" width="20" height="20" fill="%23000"/><path d="M30,20 L50,20 L50,40 L30,40 Z" fill="%23555"/><rect x="35" y="25" width="5" height="5" fill="%23daa520"/><rect x="40" y="25" width="5" height="5" fill="%23daa520"/><rect x="35" y="30" width="5" height="5" fill="%23daa520"/><rect x="40" y="30" width="5" height="5" fill="%23daa520"/></svg>');
+        }
+
+        .object-castle {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect x="20" y="40" width="40" height="30" fill="%23777"/><rect x="30" y="50" width="20" height="20" fill="%23333"/><rect x="15" y="30" width="10" height="40" fill="%23555"/><rect x="55" y="30" width="10" height="40" fill="%23555"/><rect x="25" y="20" width="10" height="50" fill="%23555"/><rect x="45" y="20" width="10" height="50" fill="%23555"/><polygon points="15,30 25,20 35,30" fill="%238b0000"/><polygon points="45,20 55,30 65,30" fill="%238b0000"/></svg>');
+        }
+
+        .object-cave {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><path d="M20,70 Q40,30 60,70 Z" fill="%23333" stroke="%23000" stroke-width="2"/><ellipse cx="40" cy="50" rx="15" ry="10" fill="%23000"/></svg>');
+        }
+
+        .object-ruins {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect x="25" y="40" width="30" height="30" fill="%23775533" stroke="%23554422" stroke-width="1"/><rect x="30" y="50" width="10" height="20" fill="%23333"/><rect x="45" y="50" width="5" height="20" fill="%23333"/><rect x="30" y="30" width="20" height="10" fill="%23775533" stroke="%23554422" stroke-width="1"/><line x1="30" y1="30" x2="25" y2="40" stroke="%23554422" stroke-width="1"/><line x1="50" y1="30" x2="55" y2="40" stroke="%23554422" stroke-width="1"/></svg>');
+        }
+
+        /* Monster icons */
+        .monster-goblin {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="30" r="15" fill="%2333aa33"/><rect x="30" y="45" width="20" height="25" fill="%2333aa33"/><circle cx="35" cy="25" r="3" fill="%23000"/><circle cx="45" cy="25" r="3" fill="%23000"/><path d="M35,35 Q40,40 45,35" stroke="%23000" fill="none" stroke-width="2"/><path d="M30,45 L20,70 M50,45 L60,70" stroke="%2333aa33" stroke-width="5" stroke-linecap="round"/></svg>');
+        }
+
+        .monster-orc {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="30" r="15" fill="%23338833"/><rect x="30" y="45" width="20" height="25" fill="%23338833"/><circle cx="35" cy="25" r="3" fill="%23000"/><circle cx="45" cy="25" r="3" fill="%23000"/><path d="M35,35 Q40,38 45,35" stroke="%23000" fill="none" stroke-width="2"/><path d="M30,45 L20,70 M50,45 L60,70" stroke="%23338833" stroke-width="6" stroke-linecap="round"/><path d="M40,50 L40,60" stroke="%23000" stroke-width="2"/></svg>');
+        }
+
+        .monster-dragon {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><path d="M20,50 Q30,30 50,20 Q70,30 60,50 Q70,70 50,60 Q30,70 20,50 Z" fill="%238b0000"/><path d="M50,20 L50,10 M60,30 L70,25 M70,50 L80,50 M60,70 L70,75 M50,60 L50,70 M30,70 L25,80 M20,50 L10,50 M30,30 L25,20" stroke="%23daa520" stroke-width="2" stroke-linecap="round"/><circle cx="40" cy="40" r="3" fill="%23000"/><circle cx="50" cy="40" r="3" fill="%23000"/></svg>');
+        }
+
+        .monster-skeleton {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="25" r="15" fill="%23ddd"/><rect x="35" y="40" width="10" height="30" fill="%23ddd"/><path d="M25,40 L15,60 M55,40 L65,60" stroke="%23ddd" stroke-width="5" stroke-linecap="round"/><path d="M35,70 L30,80 M45,70 L50,80" stroke="%23ddd" stroke-width="5" stroke-linecap="round"/><circle cx="35" cy="20" r="3" fill="%23000"/><circle cx="45" cy="20" r="3" fill="%23000"/><path d="M38,28 Q40,30 42,28" stroke="%23000" fill="none" stroke-width="1"/></svg>');
+        }
+
+        .monster-boss {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="30" fill="%238b0000"/><circle cx="40" cy="40" r="25" fill="%23daa520"/><path d="M25,25 L55,55 M25,55 L55,25" stroke="%238b0000" stroke-width="5"/><circle cx="40" cy="40" r="15" fill="%238b0000"/><path d="M40,30 L40,50 M30,40 L50,40" stroke="%23daa520" stroke-width="3"/></svg>');
+        }
+
+        /* Animation classes */
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .slide-in {
+            animation: slideIn 0.4s;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="logo">DARK REALMS</div>
+            <div>
+                <button class="menu-button" id="save-btn">Save Map</button>
+                <button class="menu-button" id="load-btn">Load Map</button>
+                <button class="menu-button" id="view-btn">View Mode</button>
+            </div>
+        </header>
+
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Terrain</div>
+                <div class="terrain-options">
+                    <div class="option" data-terrain="grass">
+                        <div class="option-icon terrain-grass"></div>
+                        <div>Grasslands</div>
+                    </div>
+                    <div class="option" data-terrain="winter">
+                        <div class="option-icon terrain-winter"></div>
+                        <div>Winter</div>
+                    </div>
+                    <div class="option" data-terrain="desert">
+                        <div class="option-icon terrain-desert"></div>
+                        <div>Desert</div>
+                    </div>
+                    <div class="option" data-terrain="swamp">
+                        <div class="option-icon terrain-swamp"></div>
+                        <div>Swamp</div>
+                    </div>
+                    <div class="option" data-terrain="mountain">
+                        <div class="option-icon terrain-mountain"></div>
+                        <div>Mountains</div>
+                    </div>
+                    <div class="option" data-terrain="water">
+                        <div class="option-icon terrain-water"></div>
+                        <div>Water</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Objects</div>
+                <div class="object-options">
+                    <div class="option" data-object="village">
+                        <div class="option-icon object-village"></div>
+                        <div>Village</div>
+                    </div>
+                    <div class="option" data-object="dungeon">
+                        <div class="option-icon object-dungeon"></div>
+                        <div>Dungeon</div>
+                    </div>
+                    <div class="option" data-object="castle">
+                        <div class="option-icon object-castle"></div>
+                        <div>Castle</div>
+                    </div>
+                    <div class="option" data-object="cave">
+                        <div class="option-icon object-cave"></div>
+                        <div>Cave</div>
+                    </div>
+                    <div class="option" data-object="ruins">
+                        <div class="option-icon object-ruins"></div>
+                        <div>Ruins</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Monsters/Enemies</div>
+                <div class="monster-options">
+                    <div class="option" data-monster="goblin">
+                        <div class="option-icon monster-goblin"></div>
+                        <div>Goblins</div>
+                    </div>
+                    <div class="option" data-monster="orc">
+                        <div class="option-icon monster-orc"></div>
+                        <div>Orcs</div>
+                    </div>
+                    <div class="option" data-monster="dragon">
+                        <div class="option-icon monster-dragon"></div>
+                        <div>Dragon</div>
+                    </div>
+                    <div class="option" data-monster="skeleton">
+                        <div class="option-icon monster-skeleton"></div>
+                        <div>Skeletons</div>
+                    </div>
+                    <div class="option" data-monster="boss">
+                        <div class="option-icon monster-boss"></div>
+                        <div>BOSS CAMP</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Tools</div>
+                <button class="menu-button" id="select-btn">Select Area</button>
+                <button class="menu-button" id="fog-btn">Add Fog of War</button>
+                <button class="menu-button" id="clear-btn">Clear Selection</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="map-container" id="map-container">
+                <div class="map-grid" id="map-grid"></div>
+                <div class="selection-area" id="selection-area"></div>
+            </div>
+
+            <div class="controls">
+                <div class="zoom-level" id="zoom-level">100%</div>
+                <button class="control-button" id="zoom-in">+</button>
+                <button class="control-button" id="zoom-out">-</button>
+                <button class="control-button" id="center-btn">⌂</button>
+            </div>
+
+            <div class="view-mode-controls" id="view-mode-controls" style="display: none;">
+                <button class="menu-button" id="exit-view-btn">Exit View</button>
+            </div>
+        </div>
+
+        <div class="context-menu" id="context-menu">
+            <div class="context-menu-item" data-action="add-village">Add Village</div>
+            <div class="context-menu-item" data-action="add-dungeon">Add Dungeon</div>
+            <div class="context-menu-item" data-action="add-castle">Add Castle</div>
+            <div class="context-menu-item" data-action="add-monster">Add Monster Camp</div>
+            <div class="context-menu-item" data-action="add-boss">Add Boss Camp</div>
+            <div class="context-menu-item" data-action="delete">Delete</div>
+        </div>
+
+        <div class="modal" id="preview-modal">
+            <div class="modal-content">
+                <button class="close-modal" id="close-preview">&times;</button>
+                <div class="preview-image" id="preview-image"></div>
+                <div class="tab-buttons">
+                    <button class="tab-button active" data-tab="terrain-tab">Terrain</button>
+                    <button class="tab-button" data-tab="objects-tab">Objects</button>
+                    <button class="tab-button" data-tab="monsters-tab">Monsters</button>
+                </div>
+                <div class="tab-content active" id="terrain-tab">
+                    <h3>Terrain Types</h3>
+                    <p>Select from various terrain types to create diverse landscapes for your adventures.</p>
+                </div>
+                <div class="tab-content" id="objects-tab">
+                    <h3>Map Objects</h3>
+                    <p>Add villages, dungeons, castles and other points of interest to your map.</p>
+                </div>
+                <div class="tab-content" id="monsters-tab">
+                    <h3>Enemies & Monsters</h3>
+                    <p>Mark enemy locations, monster camps and boss encounters on your map.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="save-modal">
+            <div class="modal-content">
+                <button class="close-modal" id="close-save">&times;</button>
+                <h2>Save Map</h2>
+                <input type="text" class="save-load-input" id="map-name" placeholder="Map Name">
+                <div class="save-load-options">
+                    <button class="menu-button" id="save-confirm">Save</button>
+                    <button class="menu-button" id="save-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="load-modal">
+            <div class="modal-content">
+                <button class="close-modal" id="close-load">&times;</button>
+                <h2>Load Map</h2>
+                <select class="save-load-input" id="saved-maps">
+                    <option value="">Select a saved map</option>
+                </select>
+                <div class="save-load-options">
+                    <button class="menu-button" id="load-confirm">Load</button>
+                    <button class="menu-button" id="delete-map">Delete</button>
+                    <button class="menu-button" id="load-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Map state
+            const state = {
+                selectedTool: null,
+                selectedTerrain: null,
+                selectedObject: null,
+                selectedMonster: null,
+                isViewMode: false,
+                zoomLevel: 1,
+                isSelecting: false,
+                selectionStart: { x: 0, y: 0 },
+                selectionEnd: { x: 0, y: 0 },
+                draggedObject: null,
+                dragOffset: { x: 0, y: 0 },
+                contextMenuPosition: { x: 0, y: 0 }
+            };
+
+            // DOM elements
+            const mapContainer = document.getElementById('map-container');
+            const mapGrid = document.getElementById('map-grid');
+            const selectionArea = document.getElementById('selection-area');
+            const zoomLevelDisplay = document.getElementById('zoom-level');
+            const contextMenu = document.getElementById('context-menu');
+            const previewModal = document.getElementById('preview-modal');
+            const saveModal = document.getElementById('save-modal');
+            const loadModal = document.getElementById('load-modal');
+            const viewModeControls = document.getElementById('view-mode-controls');
+            if (!mapContainer) {
+                console.error("Error: #map-container not found!");
+                return;
+            }
+            function handleLeftClick(e) {
+    if (state.isViewMode) return;
+    
+    const rect = mapContainer.getBoundingClientRect();
+    const x = e.clientX - rect.left + mapContainer.scrollLeft;
+    const y = e.clientY - rect.top + mapContainer.scrollTop;
+
+    if (state.selectedMonster) {
+        addMonster(state.selectedMonster, x, y);
+    } 
+    else if (state.selectedObject) {
+        addObject(state.selectedObject, x, y);
+    }
+}
+            function handleRightClick(e) {
+    e.preventDefault();
+    const rect = mapContainer.getBoundingClientRect();
+    state.contextMenuPosition = {
+        x: e.clientX - rect.left + mapContainer.scrollLeft,
+        y: e.clientY - rect.top + mapContainer.scrollTop
+    };
+    contextMenu.style.left = `${e.clientX}px`;
+    contextMenu.style.top = `${e.clientY}px`;
+    contextMenu.style.display = 'block';
+}
+            function startDrag(e) {
+    if (e.target.classList.contains('map-object')) {
+        state.draggedObject = e.target;
+        state.dragOffset = {
+            x: e.clientX - e.target.getBoundingClientRect().left,
+            y: e.clientY - e.target.getBoundingClientRect().top
+        };
+    }
+}
+
+function dragObject(e) {
+    if (state.draggedObject) {
+        const rect = mapContainer.getBoundingClientRect();
+        const x = e.clientX - rect.left + mapContainer.scrollLeft - state.dragOffset.x;
+        const y = e.clientY - rect.top + mapContainer.scrollTop - state.dragOffset.y;
+        state.draggedObject.style.left = `${x}px`;
+        state.draggedObject.style.top = `${y}px`;
+    }
+}
+
+function endDrag() {
+    state.draggedObject = null;
+}           
+            mapContainer.addEventListener('click', handleLeftClick);
+            mapContainer.addEventListener('contextmenu', handleRightClick);
+            mapContainer.addEventListener('mousedown', startDrag);
+            
+            // Initialize the map with tiles
+            function initializeMap() {
+                mapGrid.innerHTML = '';
+                const tileSize = 100;
+                const cols = 20;
+                const rows = 20;
+
+                for (let y = 0; y < rows; y++) {
+                    for (let x = 0; x < cols; x++) {
+                        const tile = document.createElement('div');
+                        tile.className = 'map-tile terrain-grass';
+                        tile.style.left = `${x * tileSize}px`;
+                        tile.style.top = `${y * tileSize}px`;
+                        tile.dataset.x = x;
+                        tile.dataset.y = y;
+                        mapGrid.appendChild(tile);
+                    }
+                }
+            }
+
+            // Zoom functionality
+            function updateZoom() {
+                mapContainer.style.transform = `scale(${state.zoomLevel})`;
+                zoomLevelDisplay.textContent = `${Math.round(state.zoomLevel * 100)}%`;
+            }
+
+            document.getElementById('zoom-in').addEventListener('click', () => {
+                state.zoomLevel = Math.min(state.zoomLevel + 0.1, 2);
+                updateZoom();
+            });
+
+            document.getElementById('zoom-out').addEventListener('click', () => {
+                state.zoomLevel = Math.max(state.zoomLevel - 0.1, 0.5);
+                updateZoom();
+            });
+
+            document.getElementById('center-btn').addEventListener('click', () => {
+                mapContainer.scrollTo({
+                    left: mapContainer.scrollWidth / 2 - mapContainer.clientWidth / 2,
+                    top: mapContainer.scrollHeight / 2 - mapContainer.clientHeight / 2,
+                    behavior: 'smooth'
+                });
+            });
+
+            // Tool selection
+            document.querySelectorAll('.terrain-options .option').forEach(option => {
+                option.addEventListener('click', () => {
+                    document.querySelectorAll('.terrain-options .option').forEach(opt => opt.classList.remove('selected'));
+                    option.classList.add('selected');
+                    state.selectedTerrain = option.dataset.terrain;
+                    state.selectedTool = 'terrain';
+                    state.selectedObject = null;
+                    state.selectedMonster = null;
+                });
+            });
+
+            document.querySelectorAll('.object-options .option').forEach(option => {
+                option.addEventListener('click', () => {
+                    document.querySelectorAll('.object-options .option').forEach(opt => opt.classList.remove('selected'));
+                    option.classList.add('selected');
+                    state.selectedObject = option.dataset.object;
+                    state.selectedTool = 'object';
+                    state.selectedTerrain = null;
+                    state.selectedMonster = null;
+                });
+            });
+
+            document.querySelectorAll('.monster-options .option').forEach(option => {
+                option.addEventListener('click', () => {
+                    document.querySelectorAll('.monster-options .option').forEach(opt => opt.classList.remove('selected'));
+                    option.classList.add('selected');
+                    state.selectedMonster = option.dataset.monster;
+                    state.selectedTool = 'monster';
+                    state.selectedTerrain = null;
+                    state.selectedObject = null;
+                });
+            });
+
+            document.getElementById('select-btn').addEventListener('click', () => {
+                state.selectedTool = 'select';
+                state.selectedTerrain = null;
+                state.selectedObject = null;
+                state.selectedMonster = null;
+            });
+
+            document.getElementById('fog-btn').addEventListener('click', () => {
+                state.selectedTool = 'fog';
+                state.selectedTerrain = null;
+                state.selectedObject = null;
+                state.selectedMonster = null;
+            });
+
+            document.getElementById('clear-btn').addEventListener('click', () => {
+                const selectedTiles = document.querySelectorAll('.map-tile.selected');
+                selectedTiles.forEach(tile => tile.classList.remove('selected'));
+                selectionArea.style.display = 'none';
+            });
+
+            // Map interaction
+            mapContainer.addEventListener('mousedown', (e) => {
+                if (state.isViewMode) return;
+
+                if (e.button === 2) { // Right click
+                    e.preventDefault();
+                    return;
+                }
+
+                const rect = mapContainer.getBoundingClientRect();
+                const x = e.clientX - rect.left + mapContainer.scrollLeft;
+                const y = e.clientY - rect.top + mapContainer.scrollTop;
+
+                if (state.selectedTool === 'select') {
+                    state.isSelecting = true;
+                    state.selectionStart = { x, y };
+                    state.selectionEnd = { x, y };
+                    selectionArea.style.left = `${x}px`;
+                    selectionArea.style.top = `${y}px`;
+                    selectionArea.style.width = '0';
+                    selectionArea.style.height = '0';
+                    selectionArea.style.display = 'block';
+                }
+            });
+
+            mapContainer.addEventListener('mousemove', (e) => {
+                if (state.isViewMode) return;
+
+                const rect = mapContainer.getBoundingClientRect();
+                const x = e.clientX - rect.left + mapContainer.scrollLeft;
+                const y = e.clientY - rect.top + mapContainer.scrollTop;
+
+                if (state.isSelecting) {
+                    state.selectionEnd = { x, y };
+                    const left = Math.min(state.selectionStart.x, state.selectionEnd.x);
+                    const top = Math.min(state.selectionStart.y, state.selectionEnd.y);
+                    const width = Math.abs(state.selectionEnd.x - state.selectionStart.x);
+                    const height = Math.abs(state.selectionEnd.y - state.selectionStart.y);
+
+                    selectionArea.style.left = `${left}px`;
+                    selectionArea.style.top = `${top}px`;
+                    selectionArea.style.width = `${width}px`;
+                    selectionArea.style.height = `${height}px`;
+                }
+
+                // Drag object
+                if (state.draggedObject) {
+                    state.draggedObject.style.left = `${x - state.dragOffset.x}px`;
+                    state.draggedObject.style.top = `${y - state.dragOffset.y}px`;
+                }
+            });
+
+            mapContainer.addEventListener('mouseup', (e) => {
+                if (state.isViewMode) return;
+
+                if (state.isSelecting) {
+                    state.isSelecting = false;
+                    
+                    // Get all tiles within selection
+                    const tiles = document.querySelectorAll('.map-tile');
+                    tiles.forEach(tile => {
+                        const tileRect = tile.getBoundingClientRect();
+                        const tileLeft = tileRect.left - mapContainer.getBoundingClientRect().left + mapContainer.scrollLeft;
+                        const tileTop = tileRect.top - mapContainer.getBoundingClientRect().top + mapContainer.scrollTop;
+                        const tileRight = tileLeft + tileRect.width;
+                        const tileBottom = tileTop + tileRect.height;
+
+                        const selectionLeft = Math.min(state.selectionStart.x, state.selectionEnd.x);
+                        const selectionTop = Math.min(state.selectionStart.y, state.selectionEnd.y);
+                        const selectionRight = Math.max(state.selectionStart.x, state.selectionEnd.x);
+                        const selectionBottom = Math.max(state.selectionStart.y, state.selectionEnd.y);
+
+                        // Check if tile is within selection
+                        if (tileLeft < selectionRight && tileRight > selectionLeft &&
+                            tileTop < selectionBottom && tileBottom > selectionTop) {
+                            tile.classList.add('selected');
+                        }
+                    });
+
+                    selectionArea.style.display = 'none';
+                }
+
+                if (state.draggedObject) {
+                    state.draggedObject = null;
+                }
+            });
+
+            // Right click context menu
+            mapContainer.addEventListener('contextmenu', (e) => {
+                if (state.isViewMode) return;
+                
+                e.preventDefault();
+                
+                const rect = mapContainer.getBoundingClientRect();
+                state.contextMenuPosition = {
+                    x: e.clientX - rect.left + mapContainer.scrollLeft,
+                    y: e.clientY - rect.top + mapContainer.scrollTop
+                };
+                
+                contextMenu.style.left = `${e.clientX}px`;
+                contextMenu.style.top = `${e.clientY}px`;
+                contextMenu.style.display = 'block';
+            });
+
+            document.addEventListener('click', () => {
+                contextMenu.style.display = 'none';
+            });
+
+            contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = item.dataset.action;
+                    
+                    switch(action) {
+                        case 'add-village':
+                            addObject('village', state.contextMenuPosition.x, state.contextMenuPosition.y);
+                            break;
+                        case 'add-dungeon':
+                            addObject('dungeon', state.contextMenuPosition.x, state.contextMenuPosition.y);
+                            break;
+                        case 'add-castle':
+                            addObject('castle', state.contextMenuPosition.x, state.contextMenuPosition.y);
+                            break;
+                        case 'add-monster':
+                            addMonster('goblin', state.contextMenuPosition.x, state.contextMenuPosition.y);
+                            break;
+                        case 'add-boss':
+                            addMonster('boss', state.contextMenuPosition.x, state.contextMenuPosition.y);
+                            break;
+                        case 'delete':
+                            // Find object at this position and delete it
+                            const objects = document.querySelectorAll('.map-object');
+                            objects.forEach(obj => {
+                                const objRect = obj.getBoundingClientRect();
+                                const objLeft = objRect.left - mapContainer.getBoundingClientRect().left + mapContainer.scrollLeft;
+                                const objTop = objRect.top - mapContainer.getBoundingClientRect().top + mapContainer.scrollTop;
+                                const objRight = objLeft + objRect.width;
+                                const objBottom = objTop + objRect.height;
+                                
+                                if (state.contextMenuPosition.x >= objLeft && state.contextMenuPosition.x <= objRight &&
+                                    state.contextMenuPosition.y >= objTop && state.contextMenuPosition.y <= objBottom) {
+                                    obj.remove();
+                                }
+                            });
+                            break;
+                    }
+                    
+                    contextMenu.style.display = 'none';
+                });
+            });
+
+            // Add object to map
+            function addObject(type, x, y) {
+                const obj = document.createElement('div');
+                obj.className = `map-object object-${type}`;
+                obj.style.left = `${x - 40}px`;
+                obj.style.top = `${y - 40}px`;
+                
+                // Make object draggable
+                obj.addEventListener('mousedown', (e) => {
+                    if (state.isViewMode) return;
+                    e.stopPropagation();
+                    state.draggedObject = obj;
+                    state.dragOffset = {
+                        x: e.clientX - obj.getBoundingClientRect().left,
+                        y: e.clientY - obj.getBoundingClientRect().top
+                    };
+                });
+                
+                mapGrid.appendChild(obj);
+                obj.classList.add('fade-in');
+            }
+
+            // Add monster to map
+            function addMonster(type, x, y) {
+                const monster = document.createElement('div');
+                monster.className = `map-object monster-${type}`;
+                if (type === 'boss') monster.classList.add('boss');
+                monster.style.left = `${x - 40}px`;
+                monster.style.top = `${y - 40}px`;
+                
+                // Make monster draggable
+                monster.addEventListener('mousedown', (e) => {
+                    if (state.isViewMode) return;
+                    e.stopPropagation();
+                    state.draggedObject = monster;
+                    state.dragOffset = {
+                        x: e.clientX - monster.getBoundingClientRect().left,
+                        y: e.clientY - monster.getBoundingClientRect().top
+                    };
+                });
+                
+                mapGrid.appendChild(monster);
+                monster.classList.add('fade-in');
+            }
+
+            // Apply terrain to selected tiles
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && state.selectedTerrain) {
+                    const selectedTiles = document.querySelectorAll('.map-tile.selected');
+                    selectedTiles.forEach(tile => {
+                        // Remove all terrain classes
+                        tile.className = tile.className.replace(/\bterrain-\S+/g, '');
+                        tile.classList.add(`terrain-${state.selectedTerrain}`);
+                    });
+                }
+            });
+
+            // View mode
+            document.getElementById('view-btn').addEventListener('click', () => {
+                state.isViewMode = true;
+                viewModeControls.style.display = 'flex';
+                document.querySelectorAll('.map-object').forEach(obj => {
+                    obj.style.cursor = 'pointer';
+                });
+            });
+
+            document.getElementById('exit-view-btn').addEventListener('click', () => {
+                state.isViewMode = false;
+                viewModeControls.style.display = 'none';
+                document.querySelectorAll('.map-object').forEach(obj => {
+                    obj.style.cursor = 'move';
+                });
+            });
+
+            // Save/load functionality
+            document.getElementById('save-btn').addEventListener('click', () => {
+                saveModal.classList.add('active');
+            });
+
+            document.getElementById('load-btn').addEventListener('click', () => {
+                loadModal.classList.add('active');
+                updateSavedMapsList();
+            });
+
+            document.getElementById('close-save').addEventListener('click', () => {
+                saveModal.classList.remove('active');
+            });
+
+            document.getElementById('close-load').addEventListener('click', () => {
+                loadModal.classList.remove('active');
+            });
+
+            document.getElementById('save-confirm').addEventListener('click', () => {
+                const mapName = document.getElementById('map-name').value.trim();
+                if (mapName) {
+                    saveMap(mapName);
+                    saveModal.classList.remove('active');
+                    document.getElementById('map-name').value = '';
+                }
+            });
+
+            document.getElementById('load-confirm').addEventListener('click', () => {
+                const selectedMap = document.getElementById('saved-maps').value;
+                if (selectedMap) {
+                    loadMap(selectedMap);
+                    loadModal.classList.remove('active');
+                }
+            });
+
+            document.getElementById('delete-map').addEventListener('click', () => {
+                const selectedMap = document.getElementById('saved-maps').value;
+                if (selectedMap && confirm(`Delete "${selectedMap}"?`)) {
+                    localStorage.removeItem(`dnd_map_${selectedMap}`);
+                    updateSavedMapsList();
+                }
+            });
+
+            function saveMap(name) {
+                const mapData = {
+                    tiles: [],
+                    objects: []
+                };
+
+                // Save tiles
+                document.querySelectorAll('.map-tile').forEach(tile => {
+                    mapData.tiles.push({
+                        x: tile.dataset.x,
+                        y: tile.dataset.y,
+                        class: tile.className
+                    });
+                });
+
+                // Save objects
+                document.querySelectorAll('.map-object').forEach(obj => {
+                    mapData.objects.push({
+                        left: obj.style.left,
+                        top: obj.style.top,
+                        class: obj.className
+                    });
+                });
+
+                localStorage.setItem(`dnd_map_${name}`, JSON.stringify(mapData));
+            }
+
+            function loadMap(name) {
+                const mapData = JSON.parse(localStorage.getItem(`dnd_map_${name}`));
+                if (!mapData) return;
+
+                // Clear current map
+                mapGrid.innerHTML = '';
+
+                // Load tiles
+                mapData.tiles.forEach(tileData => {
+                    const tile = document.createElement('div');
+                    tile.className = tileData.class;
+                    tile.style.left = `${tileData.x * 100}px`;
+                    tile.style.top = `${tileData.y * 100}px`;
+                    tile.dataset.x = tileData.x;
+                    tile.dataset.y = tileData.y;
+                    mapGrid.appendChild(tile);
+                });
+
+                // Load objects
+                mapData.objects.forEach(objData => {
+                    const obj = document.createElement('div');
+                    obj.className = objData.class;
+                    obj.style.left = objData.left;
+                    obj.style.top = objData.top;
+                    
+                    // Make object draggable
+                    obj.addEventListener('mousedown', (e) => {
+                        if (state.isViewMode) return;
+                        e.stopPropagation();
+                        state.draggedObject = obj;
+                        state.dragOffset = {
+                            x: e.clientX - obj.getBoundingClientRect().left,
+                            y: e.clientY - obj.getBoundingClientRect().top
+                        };
+                    });
+                    
+                    mapGrid.appendChild(obj);
+                });
+            }
+
+            function updateSavedMapsList() {
+                const select = document.getElementById('saved-maps');
+                select.innerHTML = '<option value="">Select a saved map</option>';
+                
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('dnd_map_')) {
+                        const mapName = key.replace('dnd_map_', '');
+                        const option = document.createElement('option');
+                        option.value = mapName;
+                        option.textContent = mapName;
+                        select.appendChild(option);
+                    }
+                }
+            }
+
+            // Tab functionality
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabId = button.dataset.tab;
+                    
+                    // Update active tab button
+                    document.querySelectorAll('.tab-button').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    button.classList.add('active');
+                    
+                    // Update active tab content
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.remove('active');
+                    });
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+
+            // Initialize the map
+            initializeMap();
+            updateZoom();
+        });
+    </script>
+</body>
+</html>
